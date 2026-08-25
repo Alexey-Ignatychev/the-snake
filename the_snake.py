@@ -168,21 +168,16 @@ def main():
         head_pos = snake.get_head_position()
         # укус яблока
         if head_pos == apple.position:
-            snake.score += 1
-            WIN_SCORE = 50
-            if snake.score >= WIN_SCORE:
-                print(f'ПОЗДРАВЛЯЮ! Вы набрали {snake.score} очков и победил!')
-                snake.reset()
-                apple.randomize_position()
-                snake.score = 0
-                continue
-            while True:
-                apple.randomize_position()
-                if apple.position not in snake.positions:
-                    break
+            snake.reset()
+            apple.randomize_position()
+            snake.score = 0
+            continue
+        while True:
+            apple.randomize_position()
+            if apple.position not in snake.positions:
+                break
         # укус питона
         if head_pos in snake.positions[1:]:
-            print(f'Игра окончена! Змея укусила себя. Счет: {snake.score}.')
             snake.reset()
             apple.randomize_position()
             snake.score = 0
