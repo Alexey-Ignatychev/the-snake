@@ -83,18 +83,22 @@ class Apple(GameObject):
     """
 
     def __init__(self, body_color=APPLE_COLOR):
-        super().__init__(body_color=body_color)
+        start_pos = self._generate_initial_position()
+        super().__init__(position=start_pos, body_color=body_color)
 
-    def randomize_position(self, snake_positions=None):
+    def _generate_initial_position(self):
+        cell_count_x = randint(0, (SCREEN_WIDTH // GRID_SIZE) - 1)
+        cell_count_y = randint(0, (SCREEN_HEIGHT // GRID_SIZE) - 1)
+        return (cell_count_x * GRID_SIZE, cell_count_y * GRID_SIZE)
+
+    def randomize_position(self, snake_positions):
         """Генерирует случайные координаты для яблока, избегая змею."""
         while True:
             cell_count_x = randint(0, (SCREEN_WIDTH // GRID_SIZE) - 1)
             cell_count_y = randint(0, (SCREEN_HEIGHT // GRID_SIZE) - 1)
-            spawn_x = cell_count_x * GRID_SIZE
-            spawn_y = cell_count_y * GRID_SIZE
-            new_position = (spawn_x, spawn_y)
+            new_position = (cell_count_x * GRID_SIZE, cell_count_y * GRID_SIZE)
 
-            if snake_positions is None or new_position not in snake_positions:
+            if new_position not in snake_positions:
                 self.position = new_position
                 break
 
@@ -128,20 +132,17 @@ class Snake(GameObject):
 
     def move(self, growing=False):
         """Добавляет клеточку змейки в направлении движения
-        и удаляет последнюю плюс добовляет координаты в positions
+        и удаляет последнюю, плюс добовляет координаты в positions
         при росте.
         """
-        current_head = self.get_head_position()
-        head_x, head_y = ((
-            current_head[0] + self.direction[0] * GRID_SIZE
-        ) % SCREEN_WIDTH), ((
-            current_head[1] + self.direction[1] * GRID_SIZE
-        ) % SCREEN_HEIGHT)
-        new_head = (head_x, head_y)
+        head_x, head_y = self.get_head_position()
+        dir_x, dir_y = self.direction
+        new_x = (head_x + dir_x * GRID_SIZE) % SCREEN_WIDTH
+        new_y = (head_y + dir_y * GRID_SIZE) % SCREEN_HEIGHT
+        new_head = (new_x, new_y)
         self.positions.insert(0, new_head)
         if not growing:
-            if len(self.positions) > self.length:
-                self.last = self.positions.pop()
+            self.last = self.positions.pop()
 
     def set_next_direction(self, key):
         """
@@ -189,7 +190,6 @@ class Snake(GameObject):
 
     def reset(self):
         """Сбрасывает игру в начальное положение и состояние."""
-        screen.fill(BOARD_BACKGROUND_COLOR)
         start_x = SCREEN_WIDTH // 2
         start_y = (SCREEN_HEIGHT // 2) - GRID_SIZE
         start_position = (start_x, start_y)
@@ -208,25 +208,32 @@ def main():
 
     snake = Snake()
     apple = Apple()
-
     apple.randomize_position(snake.positions)
 
     running = True
     while running:
+
         handle_keys(snake)
         snake.update_direction()
-        snake.move(growing=False)
-        head_pos = snake.get_head_position()
-        if head_pos == apple.position:
+
+        current_head = snake.get_head_position()
+        dir_x, dir_y = snake.direction
+
+        next_x = (current_head[0] + dir_x * GRID_SIZE) % SCREEN_WIDTH
+        next_y = (current_head[1] + dir_y * GRID_SIZE) % SCREEN_HEIGHT
+        next_head = (next_x, next_y)
+
+        growing = (next_head == apple.position)
+
+        snake.move(growing=growing)
+        if growing:
             snake.grow()
             apple.randomize_position(snake.positions)
-            continue
-
-        elif head_pos in snake.positions[1:]:
+        elif next_head in snake.positions[1:]:
             snake.reset()
             apple.randomize_position(snake.positions)
-            continue
 
+        screen.fill(BOARD_BACKGROUND_COLOR)
         snake.draw()
         apple.draw()
         pg.display.update()
