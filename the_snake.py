@@ -42,7 +42,6 @@ pg.display.set_caption('Змейка')
 clock = pg.time.Clock()
 
 
-# Тут опишите все классы игры.
 class GameObject:
     """Родительский класс."""
 
@@ -82,8 +81,11 @@ class Apple(GameObject):
     генерацию координат появления яблока.
     """
 
-    def __init__(self, body_color=APPLE_COLOR):
-        start_pos = self._generate_initial_position()
+    def __init__(self, position=None, body_color=APPLE_COLOR):
+        if position is None:
+            start_pos = self._generate_initial_position()
+        else:
+            start_pos = position
         super().__init__(position=start_pos, body_color=body_color)
 
     def _generate_initial_position(self):
@@ -130,19 +132,41 @@ class Snake(GameObject):
         self.last = None
         self.score = 0
 
-    def move(self, growing=False):
+        self.needs_full_clear = False
+
+    def move(self, apple_position):
         """Добавляет клеточку змейки в направлении движения
-        и удаляет последнюю, плюс добовляет координаты в positions
-        при росте.
+        и удаляет последнюю, плюс добавляет координаты в positions
+        при росте. Возвращает True, если съели яблоко, иначе False.
+        Также обновляет флаг needs_full_clear при проигрыше.
         """
         head_x, head_y = self.get_head_position()
         dir_x, dir_y = self.direction
+        # расчёт новых координат для появления головы змеи
         new_x = (head_x + dir_x * GRID_SIZE) % SCREEN_WIDTH
         new_y = (head_y + dir_y * GRID_SIZE) % SCREEN_HEIGHT
         new_head = (new_x, new_y)
+        # Рост = координаты головы в координатах яблока
+        growing = (new_head == apple_position)
+        # добавление головы в начало списка positions (тело змеи)
         self.positions.insert(0, new_head)
+        # если нет роста - удаляет хвост
+        old_tail = None
         if not growing:
-            self.last = self.positions.pop()
+            old_tail = self.positions.pop()
+
+        # самоедство
+        if new_head in self.positions[1:]:
+            self.reset()
+            self.needs_full_clear = True
+            return False
+
+        # рост
+        if growing:
+            self.grow()
+            return True
+
+        return old_tail
 
     def set_next_direction(self, key):
         """
@@ -181,7 +205,7 @@ class Snake(GameObject):
         """Отрисовывает все сегменты змейки."""
         for pos in self.positions[1:]:
             self._draw_cell(pos)
-        # Отрисовка головы змейки
+
         self._draw_cell(self.get_head_position())
 
     def get_head_position(self):
@@ -204,52 +228,54 @@ class Snake(GameObject):
 def main():
     """Основная функция, отвечающая за логику игры"""
     pg.init()
-    screen.fill(BOARD_BACKGROUND_COLOR)
 
     snake = Snake()
     apple = Apple()
     apple.randomize_position(snake.positions)
 
+    screen.fill(BOARD_BACKGROUND_COLOR)
+    snake.draw()
+    apple.draw()
+    pg.display.flip()
+
     running = True
     while running:
-
-        handle_keys(snake)
+        running = handle_keys(snake)
         snake.update_direction()
 
-        current_head = snake.get_head_position()
-        dir_x, dir_y = snake.direction
+        old_tail_or_ate = snake.move(apple.position)
 
-        next_x = (current_head[0] + dir_x * GRID_SIZE) % SCREEN_WIDTH
-        next_y = (current_head[1] + dir_y * GRID_SIZE) % SCREEN_HEIGHT
-        next_head = (next_x, next_y)
-
-        growing = (next_head == apple.position)
-
-        snake.move(growing=growing)
-        if growing:
-            snake.grow()
+        if old_tail_or_ate is True:
             apple.randomize_position(snake.positions)
-        elif next_head in snake.positions[1:]:
-            snake.reset()
-            apple.randomize_position(snake.positions)
+        else:
+            old_tail = old_tail_or_ate
 
-        screen.fill(BOARD_BACKGROUND_COLOR)
-        snake.draw()
+            if snake.needs_full_clear:
+                screen.fill(BOARD_BACKGROUND_COLOR)
+                snake.needs_full_clear = False
+            elif old_tail is not None:
+                rect = pg.Rect(old_tail, (GRID_SIZE, GRID_SIZE))
+                pg.draw.rect(screen, BOARD_BACKGROUND_COLOR, rect)
+
         apple.draw()
-        pg.display.update()
+        snake.draw()
 
+        pg.display.flip()
         clock.tick(SPEED)
+
+    pg.quit()
 
 
 def handle_keys(game_object):
     """Функция обработки действий пользователя"""
     for event in pg.event.get():
         if event.type == pg.QUIT:
-            pg.quit()
-            raise SystemExit
+            return False
 
         elif event.type == pg.KEYDOWN:
             game_object.set_next_direction(event.key)
+
+    return True
 
 
 if __name__ == '__main__':
